@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Next Gen Gym OS - riccardopopp.de</title>
+    <meta
+      name="description"
+      content="Next Gen Gym OS ist eine smarte Plattform für moderne Fitnessstudios mit Zugang per Smartphone, Mitgliedschaften, Zahlungen, Dashboard und Studioverwaltung."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="icon" type="image/png" sizes="512x512" href="./favicon.png?v=2" />
+    <link rel="shortcut icon" type="image/png" href="./favicon.png?v=2" />
+    <link rel="apple-touch-icon" href="./favicon.png?v=2" />
+  </head>
+  <body class="dark project-detail-page">
+    <header class="site-header legal-header">
+      <a class="brand" href="./index.html">riccardopopp.de</a>
+      <nav class="legal-nav" aria-label="Projektnavigation">
+        <a href="./index.html#projects">Zurück</a>
+        <a href="./index.html#contact">Kontakt</a>
+      </nav>
+    </header>
+
+    <main class="project-detail-main">
+      <section class="project-detail-hero">
+        <div>
+          <span class="eyebrow">Aktuelles Projekt</span>
+          <h1>Next Gen Gym OS</h1>
+          <p>
+            Die smarte App für moderne Fitnessstudios. Next Gen Gym OS bündelt Zugangskontrolle,
+            Mitgliedschaften, Zahlungen, Auslastung und Studioverwaltung in einer Plattform für
+            Mitglieder, Betreiber und Studio-Ketten.
+          </p>
+          <a class="hero-cta project-detail-cta" href="./index.html#contact">Projekt anfragen <span>→</span></a>
+        </div>
+        <div class="project-detail-visual glass-card">
+          <img
+            src="./assets/nextgym-detail.png"
+            alt="Next Gen Gym OS App Vorschau"
+          />
+        </div>
+      </section>
+
+      <section class="project-detail-content glass-card">
+        <h2>App-Beschreibung</h2>
+        <p>
+          Next Gen Gym OS ist eine digitale Plattform für Fitnessstudios, die Zugangskontrolle,
+          Mitgliedschaften, Zahlungen und Studioverwaltung in einer einzigen App bündelt.
+          Mitglieder öffnen die Studiotür bequem per Smartphone, während Betreiber jederzeit
+          den Überblick über Mitglieder, Auslastung, Geräte und Umsätze behalten.
+        </p>
+        <p>
+          Die App läuft auf iOS, Android und Web und passt sich automatisch an die jeweilige
+          Rolle an. Mitglieder sehen ihren Zugang, Mitgliedschaftsstatus und Rechnungen,
+          Studio-Admins erhalten ein vollständiges Verwaltungs-Dashboard und Plattformbetreiber
+          können mehrere Studios über ein Super-Admin-Portal steuern.
+        </p>
+        <p>
+          Mitglieder können das Studio rund um die Uhr betreten - ganz ohne Schlüsselkarte oder
+          Personal vor Ort. Die App verbindet sich per Bluetooth Low Energy mit dem Türcontroller
+          und prüft vor jedem Zutritt live, ob die Mitgliedschaft aktiv ist. Wenn Bluetooth nicht
+          verfügbar ist, erscheint automatisch ein sicherer QR-Code-Fallback.
+        </p>
+        <p>
+          Mitgliedschaften und Zahlungen werden direkt in der App verwaltet. Tarife, Planwechsel,
+          Zahlungsdaten und Kündigungen laufen über ein integriertes Kundenportal mit Stripe.
+          Die Aktivierung einer Mitgliedschaft erfolgt serverseitig über Webhooks, damit keine
+          unsicheren clientseitigen Freigaben entstehen.
+        </p>
+        <p>
+          Für Betreiber zeigt das Dashboard aktive Mitglieder, heutige Check-ins, aktuelle
+          Auslastung, Umsatzübersicht, Zugangslogs, Geräte- und Türcontroller-Status,
+          Mitgliederverwaltung sowie Analytics. Über WebSockets aktualisiert sich die Auslastung
+          live, sobald Mitglieder ein- oder austreten.
+        </p>
+        <p>
+          Next Gen Gym OS ist mandantenfähig aufgebaut und eignet sich für einzelne Studios,
+          Studio-Ketten und Franchise-Modelle. Im Hintergrund arbeitet ein skalierbares Backend
+          mit PostgreSQL, NestJS, Stripe, Redis und Sentry. Die Flutter-App nutzt ein eigenes
+          Designsystem, Dark Mode, responsive Layouts und ein sauberes Rollenmodell.
+        </p>
+      </section>
+
+      <section class="project-detail-grid">
+        <article class="glass-card">
+          <h3>Für Mitglieder</h3>
+          <p>Smartphone-Zugang, Mitgliedschaftsstatus, Rechnungen, Tarife und QR-Code-Fallback in einer App.</p>
+        </article>
+        <article class="glass-card">
+          <h3>Für Betreiber</h3>
+          <p>Dashboard, Check-ins, Auslastung, Umsätze, Geräte, Zugangslogs und Mitgliederverwaltung im Blick.</p>
+        </article>
+        <article class="glass-card">
+          <h3>Für Studio-Ketten</h3>
+          <p>Mandantenfähige Struktur mit eigenem Branding, Super-Admin-Portal und skalierbarem Backend.</p>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
