@@ -24,7 +24,7 @@ $csrf = (string)$_SESSION['csrf'];
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=4">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1">
-  <link rel="stylesheet" href="overrides.css?v=11">
+  <link rel="stylesheet" href="overrides.css?v=12">
 </head>
 <body class="<?= $authenticated ? 'app-mode' : 'login-mode' ?>">
 <?php if (!$authenticated): ?>
@@ -108,6 +108,26 @@ $csrf = (string)$_SESSION['csrf'];
     <button class="primary-button" id="finishTourButton" type="button">Tour abschließen</button>
   </nav>
 
+  <button class="chat-fab" id="chatOpenButton" type="button" aria-label="Fahrerchat öffnen" title="Fahrerchat öffnen">Chat <span class="hidden" id="chatUnreadBadge">0</span></button>
+
+  <dialog id="chatDialog" class="chat-dialog">
+    <div class="dialog-card chat-card">
+      <div class="section-heading"><div><span class="kicker">Ibo · Kai · Riccardo</span><h2>Fahrerchat</h2></div><button class="icon-button" id="chatCloseButton" type="button" aria-label="Chat schließen">×</button></div>
+      <p class="chat-status" id="chatStatus" role="status" aria-live="polite">Nachrichten werden geladen …</p>
+      <div class="chat-messages" id="chatMessages" aria-live="polite"></div>
+      <div class="chat-quick" aria-label="Schnellmeldungen">
+        <button type="button" data-chat-quick="Tour fertig">Tour fertig</button>
+        <button type="button" data-chat-quick="Brauche Unterstützung">Brauche Hilfe</button>
+        <button type="button" data-chat-quick="Kurze Pause">Pause</button>
+        <button type="button" data-chat-quick="Problem vor Ort – bitte melden">Problem</button>
+      </div>
+      <form class="chat-compose" id="chatForm">
+        <label for="chatText">Nachricht<textarea id="chatText" maxlength="500" rows="2" placeholder="Kurze Nachricht an alle Fahrer" required></textarea></label>
+        <button class="primary-button" id="chatSendButton" type="submit">Senden</button>
+      </form>
+    </div>
+  </dialog>
+
   <dialog id="problemDialog">
     <form method="dialog" class="dialog-card">
       <div class="section-heading"><div><span class="kicker">Rückmeldung</span><h2>Problem melden</h2></div><button class="icon-button" value="cancel" aria-label="Schließen">×</button></div>
@@ -149,7 +169,7 @@ $csrf = (string)$_SESSION['csrf'];
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js?v=1" defer></script>
-  <script src="app.js?v=11" defer></script>
+  <script src="app.js?v=12" defer></script>
 <?php endif; ?>
 </body>
 </html>

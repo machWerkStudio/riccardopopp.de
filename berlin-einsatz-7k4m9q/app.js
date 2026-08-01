@@ -8,6 +8,8 @@
   const localKey = 'berlin-einsatz-backup-v1';
   const driverKey = 'berlin-einsatz-driver-v1';
   const backupKey = 'berlin-einsatz-last-backup-v1';
+  const chatQueueKey = 'berlin-einsatz-chat-queue-v1';
+  const chatSeenKey = 'berlin-einsatz-chat-seen-v1';
   const problemTypes = ['Keine freie Fläche', 'Pfosten / Halterung beschädigt', 'Abschnitt nicht zugänglich', 'Ordnungsamt / Polizei', 'Sonstige Besonderheit'];
   const dom = {
     overview: document.querySelector('#overviewView'), tour: document.querySelector('#tourView'), groups: document.querySelector('#tourGroups'),
@@ -24,7 +26,9 @@
     captureNote: document.querySelector('#captureNote'), captureError: document.querySelector('#captureError'), saveCapture: document.querySelector('#saveCaptureButton'),
     testLocation: document.querySelector('#testLocationButton'), testLocationStatus: document.querySelector('#testLocationStatus'), testLocationHelp: document.querySelector('#testLocationHelp'), testLocationSteps: document.querySelector('#testLocationSteps'),
     testPhoto: document.querySelector('#testPhotoInput'), testPhotoStatus: document.querySelector('#testCameraStatus'), testPhotoPreview: document.querySelector('#testPhotoPreview'),
-    testSave: document.querySelector('#testSaveButton'), testSaveStatus: document.querySelector('#testSaveStatus')
+    testSave: document.querySelector('#testSaveButton'), testSaveStatus: document.querySelector('#testSaveStatus'),
+    chatOpen: document.querySelector('#chatOpenButton'), chatUnread: document.querySelector('#chatUnreadBadge'), chatDialog: document.querySelector('#chatDialog'), chatClose: document.querySelector('#chatCloseButton'),
+    chatStatus: document.querySelector('#chatStatus'), chatMessages: document.querySelector('#chatMessages'), chatForm: document.querySelector('#chatForm'), chatText: document.querySelector('#chatText'), chatSend: document.querySelector('#chatSendButton')
   };
 
   let definitions = [];
@@ -43,6 +47,8 @@
   let testPhotoBlob = null;
   let pendingCount = 0;
   let tourMarkerMap = null;
+  let chatMessages = [];
+  let chatRefreshing = false;
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const now = () => new Date().toISOString();
@@ -518,17 +524,110 @@
     dom.offline.classList.toggle('hidden', navigator.onLine);
   }
 
+  function chatQueue() {
+    try { const queue = JSON.parse(localStorage.getItem(chatQueueKey) || '[]'); return Array.isArray(queue) ? queue : []; }
+    catch (_) { return []; }
+  }
+
+  function saveChatQueue(queue) {
+    try { localStorage.setItem(chatQueueKey, JSON.stringify(queue)); } catch (_) {}
+  }
+
+  function updateChatAvailability() {
+    const ready = Boolean(dom.driver.value);
+    dom.chatOpen.disabled = !ready;
+    dom.chatOpen.title = ready ? 'Fahrerchat öffnen' : 'Bitte zuerst Fahrer auswählen';
+  }
+
+  function renderChat() {
+    const queued = chatQueue().map(message => ({...message,pending:true}));
+    const known = new Set(chatMessages.map(message => message.id));
+    const all = [...chatMessages,...queued.filter(message => !known.has(message.id))].slice(-200);
+    dom.chatMessages.innerHTML = all.length ? all.map(message => {
+      const mine = message.driver === dom.driver.value;
+      const time = message.at ? new Date(message.at).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) : '';
+      return `<article class="chat-message ${mine ? 'mine' : ''} ${message.pending ? 'pending' : ''}"><div><strong>${esc(message.driver)}</strong><time>${esc(time)}${message.pending ? ' · wartet' : ''}</time></div><p>${esc(message.text)}</p></article>`;
+    }).join('') : '<p class="chat-empty">Noch keine Nachrichten. Ihr könnt direkt loslegen.</p>';
+    dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+    const seen = localStorage.getItem(chatSeenKey) || '';
+    const unread = chatMessages.filter(message => message.driver !== dom.driver.value && String(message.at || '') > seen).length;
+    dom.chatUnread.textContent = String(unread);
+    dom.chatUnread.classList.toggle('hidden', unread === 0 || dom.chatDialog.open);
+  }
+
+  function markChatSeen() {
+    const latest = chatMessages.reduce((value,message) => String(message.at || '') > value ? String(message.at || '') : value, localStorage.getItem(chatSeenKey) || '');
+    if (latest) localStorage.setItem(chatSeenKey,latest);
+    dom.chatUnread.classList.add('hidden');
+  }
+
+  async function refreshChat() {
+    if (chatRefreshing || !navigator.onLine || document.hidden) return;
+    chatRefreshing = true;
+    try {
+      const response = await fetch('chat.php',{cache:'no-store',credentials:'same-origin'});
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.message || 'Chat nicht erreichbar');
+      chatMessages = Array.isArray(data.messages) ? data.messages : [];
+      dom.chatStatus.textContent = chatQueue().length ? `${chatQueue().length} Nachricht(en) warten auf Übertragung.` : 'Chat ist aktuell.';
+      renderChat();
+      if (dom.chatDialog.open) markChatSeen();
+    } catch (_) {
+      dom.chatStatus.textContent = 'Chat momentan nicht erreichbar – Nachrichten können lokal vorgemerkt werden.';
+    } finally { chatRefreshing = false; }
+  }
+
+  async function flushChatQueue() {
+    if (!navigator.onLine) return;
+    const queue = chatQueue();
+    let sent = 0;
+    for (const message of queue) {
+      try {
+        const response = await fetch('chat.php',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(message)});
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.message || 'Senden fehlgeschlagen');
+        sent += 1;
+      } catch (_) { break; }
+    }
+    if (sent) saveChatQueue(queue.slice(sent));
+    renderChat();
+    await refreshChat();
+  }
+
+  async function sendChat(text) {
+    const driver = dom.driver.value;
+    const clean = String(text || '').trim().slice(0,500);
+    if (!driver || !clean) return;
+    const queue = chatQueue();
+    queue.push({id:uuid(),driver,text:clean,at:now()});
+    saveChatQueue(queue.slice(-50));
+    dom.chatText.value = '';
+    dom.chatStatus.textContent = navigator.onLine ? 'Nachricht wird gesendet …' : 'Offline vorgemerkt – wird später gesendet.';
+    renderChat();
+    await flushChatQueue();
+  }
+
+  async function openChat() {
+    if (!dom.driver.value) return;
+    dom.chatDialog.showModal();
+    renderChat();
+    await flushChatQueue();
+    await refreshChat();
+    markChatSeen();
+  }
+
   async function init() {
     const definitionResponse = await fetch('touren.php', {cache:'no-store'});
     const definitionData = await definitionResponse.json(); definitions = definitionData.tours;
     try { const server = await apiRequest(); state = normalizeState(server.state); }
     catch (_) { state = normalizeState(localBackup()); setSaveLabel('Lokale Sicherung', true); }
-    await mergePendingMarkers(); fillMeta(); renderOverview(); updateOnlineState(); await updatePendingNotice();
+    await mergePendingMarkers(); fillMeta(); updateChatAvailability(); renderOverview(); updateOnlineState(); await updatePendingNotice();
     if (navigator.onLine) syncCaptures();
+    refreshChat(); flushChatQueue();
     const hashMatch = location.hash.match(/^#tour-(\d+)$/); if (hashMatch) openTour(Number(hashMatch[1]));
   }
 
-  dom.driver.addEventListener('change', () => { localStorage.setItem(driverKey, dom.driver.value); setSaveLabel(dom.driver.value ? `${dom.driver.value} gespeichert` : 'Bitte Fahrer auswählen'); renderOverview(); updateTestSaveButton(); });
+  dom.driver.addEventListener('change', () => { localStorage.setItem(driverKey, dom.driver.value); setSaveLabel(dom.driver.value ? `${dom.driver.value} gespeichert` : 'Bitte Fahrer auswählen'); renderOverview(); updateTestSaveButton(); updateChatAvailability(); refreshChat(); });
   dom.back.addEventListener('click', closeTour); dom.finishButton.addEventListener('click', openFinish); dom.sync.addEventListener('click', syncAll);
   dom.saveProblem.addEventListener('click', event => {
     event.preventDefault(); if (!activeProblem || !selectedProblem) return;
@@ -560,6 +659,11 @@
     updateTestSaveButton();
   });
   dom.testSave.addEventListener('click', saveTestEvidence);
+  dom.chatOpen.addEventListener('click', openChat);
+  dom.chatClose.addEventListener('click', () => { markChatSeen(); dom.chatDialog.close(); });
+  dom.chatDialog.addEventListener('close', markChatSeen);
+  dom.chatForm.addEventListener('submit', event => { event.preventDefault(); sendChat(dom.chatText.value); });
+  document.querySelectorAll('[data-chat-quick]').forEach(button => button.addEventListener('click', () => { dom.chatText.value = button.dataset.chatQuick || ''; dom.chatText.focus(); }));
   dom.capturePhoto.addEventListener('change', async () => {
     const file = dom.capturePhoto.files?.[0]; if (!file) return;
     dom.captureError.classList.add('hidden'); dom.saveCapture.disabled = true; dom.saveCapture.textContent = 'Foto wird vorbereitet …';
@@ -596,8 +700,10 @@
     tourState.status = 'done'; tourState.finishNote = dom.finishNote.value.trim(); tourState.finishedAt = now();
     queueTourSave(activeTourId); dom.finishDialog.close(); renderTour();
   });
-  window.addEventListener('online', () => { syncAll(); updateTestSaveButton(); }); window.addEventListener('offline', () => { updateOnlineState(); updatePendingNotice(); updateTestSaveButton(); });
+  window.addEventListener('online', () => { syncAll(); updateTestSaveButton(); flushChatQueue(); }); window.addEventListener('offline', () => { updateOnlineState(); updatePendingNotice(); updateTestSaveButton(); dom.chatStatus.textContent = 'Offline – Nachrichten werden lokal vorgemerkt.'; });
   window.addEventListener('popstate', () => { if (activeTourId) closeTour(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { refreshChat(); flushChatQueue(); } });
+  setInterval(refreshChat,10000);
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});
   init().catch(() => { dom.groups.innerHTML = '<div class="notice">Die Einsatzdaten konnten nicht geladen werden. Bitte Seite neu öffnen.</div>'; });
 })();
