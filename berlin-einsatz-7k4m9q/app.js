@@ -23,7 +23,8 @@
     retryLocation: document.querySelector('#retryLocationButton'), locationHelp: document.querySelector('#locationPermissionHelp'), locationSteps: document.querySelector('#locationPermissionSteps'), capturePhoto: document.querySelector('#capturePhoto'), capturePreview: document.querySelector('#capturePreview'),
     captureNote: document.querySelector('#captureNote'), captureError: document.querySelector('#captureError'), saveCapture: document.querySelector('#saveCaptureButton'),
     testLocation: document.querySelector('#testLocationButton'), testLocationStatus: document.querySelector('#testLocationStatus'), testLocationHelp: document.querySelector('#testLocationHelp'), testLocationSteps: document.querySelector('#testLocationSteps'),
-    testPhoto: document.querySelector('#testPhotoInput'), testPhotoStatus: document.querySelector('#testCameraStatus'), testPhotoPreview: document.querySelector('#testPhotoPreview')
+    testPhoto: document.querySelector('#testPhotoInput'), testPhotoStatus: document.querySelector('#testCameraStatus'), testPhotoPreview: document.querySelector('#testPhotoPreview'),
+    testSave: document.querySelector('#testSaveButton'), testSaveStatus: document.querySelector('#testSaveStatus')
   };
 
   let definitions = [];
@@ -38,6 +39,8 @@
   let captureBlob = null;
   let capturePreviewUrl = '';
   let testPreviewUrl = '';
+  let testPosition = null;
+  let testPhotoBlob = null;
   let pendingCount = 0;
   let tourMarkerMap = null;
 
@@ -342,6 +345,8 @@
   }
 
   function testPhoneLocation() {
+    testPosition = null;
+    updateTestSaveButton();
     dom.testLocationHelp.classList.add('hidden');
     dom.testLocationStatus.className = 'gps-status loading';
     dom.testLocationStatus.textContent = 'Standort wird ermittelt …';
@@ -353,8 +358,10 @@
     }
     navigator.geolocation.getCurrentPosition(position => {
       const accuracy = Math.round(position.coords.accuracy);
+      testPosition = {lat:position.coords.latitude,lng:position.coords.longitude,accuracy:position.coords.accuracy};
       dom.testLocationStatus.className = `gps-status ${accuracy > 35 ? 'warning' : 'success'}`;
       dom.testLocationStatus.textContent = `✓ Standort funktioniert · Genauigkeit ±${accuracy} Meter${accuracy > 35 ? ' – draußen bitte noch einmal testen' : ''}`;
+      updateTestSaveButton();
     }, error => {
       dom.testLocationStatus.className = 'gps-status error';
       dom.testLocationStatus.textContent = error.code === 1 ? 'Standortfreigabe wurde nicht erlaubt oder ist blockiert.' : 'Standort konnte nicht bestimmt werden. Bitte draußen erneut testen.';
@@ -364,6 +371,45 @@
         dom.testLocation.textContent = 'Nach Freigabe erneut testen';
       }
     }, {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  }
+
+  function updateTestSaveButton() {
+    const ready = Boolean(dom.driver.value && testPosition && testPhotoBlob && navigator.onLine);
+    dom.testSave.disabled = !ready;
+    if (!dom.driver.value) dom.testSave.title = 'Bitte zuerst oben einen Fahrer auswählen.';
+    else if (!testPosition) dom.testSave.title = 'Bitte zuerst den Standort testen.';
+    else if (!testPhotoBlob) dom.testSave.title = 'Bitte zuerst die Kamera testen.';
+    else if (!navigator.onLine) dom.testSave.title = 'Für den Speichertest wird eine Internetverbindung benötigt.';
+    else dom.testSave.title = '';
+  }
+
+  async function saveTestEvidence() {
+    updateTestSaveButton();
+    if (dom.testSave.disabled) return;
+    dom.testSave.disabled = true;
+    dom.testSave.textContent = 'Test wird gespeichert …';
+    dom.testSaveStatus.className = 'test-save-status loading';
+    dom.testSaveStatus.textContent = 'Foto und Standort werden an den Testbereich des Servers übertragen.';
+    try {
+      const form = new FormData();
+      form.append('driver',dom.driver.value);
+      form.append('lat',String(testPosition.lat));
+      form.append('lng',String(testPosition.lng));
+      form.append('accuracy',String(testPosition.accuracy));
+      form.append('capturedAt',now());
+      form.append('photo',testPhotoBlob,'test.jpg');
+      const response = await fetch('test-upload.php',{method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':csrf},body:form});
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.message || 'Der Server hat den Test nicht bestätigt.');
+      dom.testSaveStatus.className = 'test-save-status success';
+      dom.testSaveStatus.textContent = `✓ Speichern funktioniert · ${data.driver} · ${new Date(data.savedAt).toLocaleString('de-DE')} · Testdaten getrennt von den Touren gespeichert`;
+    } catch (error) {
+      dom.testSaveStatus.className = 'test-save-status error';
+      dom.testSaveStatus.textContent = `Speichertest fehlgeschlagen: ${error.message || 'Unbekannter Fehler'}`;
+    } finally {
+      dom.testSave.textContent = 'Testnachweis erneut speichern';
+      updateTestSaveButton();
+    }
   }
 
   function openCapture(def, index) {
@@ -455,7 +501,7 @@
     const hashMatch = location.hash.match(/^#tour-(\d+)$/); if (hashMatch) openTour(Number(hashMatch[1]));
   }
 
-  dom.driver.addEventListener('change', () => { localStorage.setItem(driverKey, dom.driver.value); setSaveLabel(dom.driver.value ? `${dom.driver.value} gespeichert` : 'Bitte Fahrer auswählen'); renderOverview(); });
+  dom.driver.addEventListener('change', () => { localStorage.setItem(driverKey, dom.driver.value); setSaveLabel(dom.driver.value ? `${dom.driver.value} gespeichert` : 'Bitte Fahrer auswählen'); renderOverview(); updateTestSaveButton(); });
   dom.back.addEventListener('click', closeTour); dom.finishButton.addEventListener('click', openFinish); dom.sync.addEventListener('click', syncAll);
   dom.saveProblem.addEventListener('click', event => {
     event.preventDefault(); if (!activeProblem || !selectedProblem) return;
@@ -465,16 +511,28 @@
   });
   dom.retryLocation.addEventListener('click', locatePhone);
   dom.testLocation.addEventListener('click', testPhoneLocation);
-  dom.testPhoto.addEventListener('change', () => {
+  dom.testPhoto.addEventListener('change', async () => {
     const file = dom.testPhoto.files?.[0];
     if (!file) return;
-    if (testPreviewUrl) URL.revokeObjectURL(testPreviewUrl);
-    testPreviewUrl = URL.createObjectURL(file);
-    dom.testPhotoPreview.src = testPreviewUrl;
-    dom.testPhotoPreview.classList.remove('hidden');
-    dom.testPhotoStatus.className = 'test-camera-status success';
-    dom.testPhotoStatus.textContent = `✓ Kamera funktioniert · Foto ausgewählt (${Math.max(1, Math.round(file.size / 1024))} KB) · nichts gespeichert`;
+    testPhotoBlob = null;
+    updateTestSaveButton();
+    dom.testPhotoStatus.className = 'test-camera-status';
+    dom.testPhotoStatus.textContent = 'Testfoto wird vorbereitet …';
+    try {
+      testPhotoBlob = await compressPhoto(file);
+      if (testPreviewUrl) URL.revokeObjectURL(testPreviewUrl);
+      testPreviewUrl = URL.createObjectURL(testPhotoBlob);
+      dom.testPhotoPreview.src = testPreviewUrl;
+      dom.testPhotoPreview.classList.remove('hidden');
+      dom.testPhotoStatus.className = 'test-camera-status success';
+      dom.testPhotoStatus.textContent = `✓ Kamera funktioniert · Testfoto bereit (${Math.max(1, Math.round(testPhotoBlob.size / 1024))} KB)`;
+    } catch (_) {
+      dom.testPhotoStatus.className = 'test-camera-status error';
+      dom.testPhotoStatus.textContent = 'Das Testfoto konnte nicht vorbereitet werden.';
+    }
+    updateTestSaveButton();
   });
+  dom.testSave.addEventListener('click', saveTestEvidence);
   dom.capturePhoto.addEventListener('change', async () => {
     const file = dom.capturePhoto.files?.[0]; if (!file) return;
     dom.captureError.classList.add('hidden'); dom.saveCapture.disabled = true; dom.saveCapture.textContent = 'Foto wird vorbereitet …';
@@ -511,7 +569,7 @@
     tourState.status = 'done'; tourState.finishNote = dom.finishNote.value.trim(); tourState.finishedAt = now();
     queueTourSave(activeTourId); dom.finishDialog.close(); renderTour();
   });
-  window.addEventListener('online', syncAll); window.addEventListener('offline', () => { updateOnlineState(); updatePendingNotice(); });
+  window.addEventListener('online', () => { syncAll(); updateTestSaveButton(); }); window.addEventListener('offline', () => { updateOnlineState(); updatePendingNotice(); updateTestSaveButton(); });
   window.addEventListener('popstate', () => { if (activeTourId) closeTour(); });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js').catch(() => {});
   init().catch(() => { dom.groups.innerHTML = '<div class="notice">Die Einsatzdaten konnten nicht geladen werden. Bitte Seite neu öffnen.</div>'; });

@@ -24,7 +24,7 @@ $csrf = (string)$_SESSION['csrf'];
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=4">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1">
-  <link rel="stylesheet" href="overrides.css?v=7">
+  <link rel="stylesheet" href="overrides.css?v=8">
 </head>
 <body class="<?= $authenticated ? 'app-mode' : 'login-mode' ?>">
 <?php if (!$authenticated): ?>
@@ -75,7 +75,7 @@ $csrf = (string)$_SESSION['csrf'];
       <section class="test-card" aria-labelledby="testTitle">
         <span class="kicker">Gerätetest · Ibo · Kai · Riccardo</span>
         <h2 id="testTitle">Vor dem Einsatz testen</h2>
-        <p>Hier können Standort und Kamera geprüft werden. Es werden keine Tourdaten und kein Plakat gespeichert.</p>
+        <p>Hier können Standort, Kamera und das Speichern auf dem Server geprüft werden. Der Test verändert keine Tour und keine Plakatzahl.</p>
         <div class="test-actions">
           <button class="secondary-button full-button location-button" id="testLocationButton" type="button">Standort testen</button>
           <label class="photo-picker test-photo-picker">Kamera testen
@@ -90,6 +90,8 @@ $csrf = (string)$_SESSION['csrf'];
         </div>
         <p class="test-camera-status" id="testCameraStatus" aria-live="polite">Kamera noch nicht getestet.</p>
         <img id="testPhotoPreview" class="capture-preview hidden" alt="Vorschau des Testfotos">
+        <button class="primary-button full-button test-save-button" id="testSaveButton" type="button" disabled>Testnachweis auf Server speichern</button>
+        <p class="test-save-status hidden" id="testSaveStatus" role="status" aria-live="polite"></p>
       </section>
     </section>
 
@@ -147,7 +149,7 @@ $csrf = (string)$_SESSION['csrf'];
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js?v=1" defer></script>
-  <script src="app.js?v=7" defer></script>
+  <script src="app.js?v=8" defer></script>
 <?php endif; ?>
 </body>
 </html>

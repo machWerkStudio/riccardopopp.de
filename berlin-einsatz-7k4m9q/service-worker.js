@@ -1,5 +1,5 @@
-const CACHE='berlin-einsatz-v7';
-const ASSETS=['./styles.css?v=4','./vendor/leaflet/leaflet.css?v=1','./vendor/leaflet/leaflet.js?v=1','./overrides.css?v=7','./app.js?v=7','./manifest.webmanifest'];
+const CACHE='berlin-einsatz-v8';
+const ASSETS=['./styles.css?v=4','./vendor/leaflet/leaflet.css?v=1','./vendor/leaflet/leaflet.js?v=1','./overrides.css?v=8','./app.js?v=8','./manifest.webmanifest'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))));
 self.addEventListener('fetch',event=>{
