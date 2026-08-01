@@ -6,6 +6,7 @@ requireAuthentication();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Robots-Tag: noindex, nofollow, noarchive');
+ini_set('display_errors', '0');
 
 function testResponse(int $status, array $payload): void
 {
@@ -13,6 +14,11 @@ function testResponse(int $status, array $payload): void
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
+
+set_exception_handler(static function (Throwable $error): void {
+    error_log('Testupload: ' . $error->getMessage());
+    testResponse(500, ['ok' => false, 'message' => 'Serverfehler beim Speichertest. Bitte test-upload.php erneut hochladen.']);
+});
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     testResponse(405, ['ok' => false, 'message' => 'Methode nicht erlaubt.']);
@@ -35,8 +41,16 @@ if (!isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK || $
     testResponse(422, ['ok' => false, 'message' => 'Testfoto fehlt oder ist zu groß.']);
 }
 
-$finfo = new finfo(FILEINFO_MIME_TYPE);
-$mime = $finfo->file($_FILES['photo']['tmp_name']);
+$mime = '';
+if (class_exists('finfo')) {
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = (string)$finfo->file($_FILES['photo']['tmp_name']);
+} elseif (function_exists('mime_content_type')) {
+    $mime = (string)mime_content_type($_FILES['photo']['tmp_name']);
+} elseif (function_exists('getimagesize')) {
+    $imageInfo = getimagesize($_FILES['photo']['tmp_name']);
+    $mime = is_array($imageInfo) ? (string)($imageInfo['mime'] ?? '') : '';
+}
 if (!in_array($mime, ['image/jpeg', 'image/webp'], true)) {
     testResponse(422, ['ok' => false, 'message' => 'Nur JPEG- oder WebP-Testfotos sind erlaubt.']);
 }

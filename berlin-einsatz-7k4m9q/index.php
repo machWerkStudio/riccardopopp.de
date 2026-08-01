@@ -24,7 +24,7 @@ $csrf = (string)$_SESSION['csrf'];
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=4">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1">
-  <link rel="stylesheet" href="overrides.css?v=8">
+  <link rel="stylesheet" href="overrides.css?v=9">
 </head>
 <body class="<?= $authenticated ? 'app-mode' : 'login-mode' ?>">
 <?php if (!$authenticated): ?>
@@ -149,7 +149,7 @@ $csrf = (string)$_SESSION['csrf'];
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js?v=1" defer></script>
-  <script src="app.js?v=8" defer></script>
+  <script src="app.js?v=9" defer></script>
 <?php endif; ?>
 </body>
 </html>

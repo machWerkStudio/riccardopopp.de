@@ -399,8 +399,13 @@
       form.append('capturedAt',now());
       form.append('photo',testPhotoBlob,'test.jpg');
       const response = await fetch('test-upload.php',{method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':csrf},body:form});
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.message || 'Der Server hat den Test nicht bestätigt.');
+      const responseText = await response.text();
+      let data = {};
+      try { data = JSON.parse(responseText); } catch (_) {}
+      if (!response.ok || !data.ok) {
+        const detail = data.message || (response.status === 404 ? 'test-upload.php wurde auf dem Server nicht gefunden.' : `Keine gültige Serverantwort (HTTP ${response.status}).`);
+        throw new Error(detail);
+      }
       dom.testSaveStatus.className = 'test-save-status success';
       dom.testSaveStatus.textContent = `✓ Speichern funktioniert · ${data.driver} · ${new Date(data.savedAt).toLocaleString('de-DE')} · Testdaten getrennt von den Touren gespeichert`;
     } catch (error) {
