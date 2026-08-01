@@ -35,7 +35,7 @@ function requireAuthentication(): void
     }
 }
 
-function cleanText(mixed $value, int $maxLength = 500): string
+function cleanText($value, int $maxLength = 500): string
 {
     $text = trim((string)$value);
     return function_exists('mb_substr') ? mb_substr($text, 0, $maxLength) : substr($text, 0, $maxLength);
