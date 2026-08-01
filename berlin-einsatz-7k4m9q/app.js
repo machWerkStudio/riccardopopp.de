@@ -21,7 +21,9 @@
     finishDialog: document.querySelector('#finishDialog'), finishCheck: document.querySelector('#finishCheck'), finishNote: document.querySelector('#finishNote'), confirmFinish: document.querySelector('#confirmFinishButton'),
     captureDialog: document.querySelector('#captureDialog'), captureStreet: document.querySelector('#captureStreet'), gpsStatus: document.querySelector('#gpsStatus'),
     retryLocation: document.querySelector('#retryLocationButton'), locationHelp: document.querySelector('#locationPermissionHelp'), locationSteps: document.querySelector('#locationPermissionSteps'), capturePhoto: document.querySelector('#capturePhoto'), capturePreview: document.querySelector('#capturePreview'),
-    captureNote: document.querySelector('#captureNote'), captureError: document.querySelector('#captureError'), saveCapture: document.querySelector('#saveCaptureButton')
+    captureNote: document.querySelector('#captureNote'), captureError: document.querySelector('#captureError'), saveCapture: document.querySelector('#saveCaptureButton'),
+    testLocation: document.querySelector('#testLocationButton'), testLocationStatus: document.querySelector('#testLocationStatus'), testLocationHelp: document.querySelector('#testLocationHelp'), testLocationSteps: document.querySelector('#testLocationSteps'),
+    testPhoto: document.querySelector('#testPhotoInput'), testPhotoStatus: document.querySelector('#testCameraStatus'), testPhotoPreview: document.querySelector('#testPhotoPreview')
   };
 
   let definitions = [];
@@ -35,6 +37,7 @@
   let capturePosition = null;
   let captureBlob = null;
   let capturePreviewUrl = '';
+  let testPreviewUrl = '';
   let pendingCount = 0;
   let tourMarkerMap = null;
 
@@ -286,12 +289,15 @@
     dom.problemDialog.showModal();
   }
 
-  function showLocationPermissionHelp() {
+  function locationPermissionSteps() {
     const android = /Android/i.test(navigator.userAgent);
-    const steps = android
+    return android
       ? ['Links neben der Adresse auf das Seiteninfo-Symbol tippen.', '„Berechtigungen“ öffnen.', 'Bei „Standort“ die Einstellung „Zulassen“ wählen.', 'Falls dort nichts angezeigt wird: Chrome-Menü → Einstellungen → Website-Einstellungen → Standort öffnen.']
       : ['Links in der Safari-Adressleiste auf das Seitenmenü tippen.', '„Mehr“ und anschließend die Website-Einstellungen öffnen.', 'Bei „Standort“ die Einstellung „Erlauben“ oder „Fragen“ wählen.', 'Falls nötig: iPhone-Einstellungen → Apps → Safari → Standort öffnen.'];
-    dom.locationSteps.innerHTML = steps.map(step => `<li>${esc(step)}</li>`).join('');
+  }
+
+  function showLocationPermissionHelp() {
+    dom.locationSteps.innerHTML = locationPermissionSteps().map(step => `<li>${esc(step)}</li>`).join('');
     dom.locationHelp.classList.remove('hidden');
     dom.retryLocation.textContent = 'Nach Freigabe erneut prüfen';
   }
@@ -333,6 +339,31 @@
       dom.gpsStatus.textContent = error.code === 1 ? 'Standortfreigabe wurde nicht erlaubt oder ist blockiert.' : 'Standort konnte nicht bestimmt werden.';
       if (error.code === 1) showLocationPermissionHelp();
     }, {enableHighAccuracy:true,timeout:15000,maximumAge:5000});
+  }
+
+  function testPhoneLocation() {
+    dom.testLocationHelp.classList.add('hidden');
+    dom.testLocationStatus.className = 'gps-status loading';
+    dom.testLocationStatus.textContent = 'Standort wird ermittelt …';
+    dom.testLocation.textContent = 'Standort erneut testen';
+    if (!navigator.geolocation) {
+      dom.testLocationStatus.className = 'gps-status error';
+      dom.testLocationStatus.textContent = 'Standortermittlung wird von diesem Browser nicht unterstützt.';
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(position => {
+      const accuracy = Math.round(position.coords.accuracy);
+      dom.testLocationStatus.className = `gps-status ${accuracy > 35 ? 'warning' : 'success'}`;
+      dom.testLocationStatus.textContent = `✓ Standort funktioniert · Genauigkeit ±${accuracy} Meter${accuracy > 35 ? ' – draußen bitte noch einmal testen' : ''}`;
+    }, error => {
+      dom.testLocationStatus.className = 'gps-status error';
+      dom.testLocationStatus.textContent = error.code === 1 ? 'Standortfreigabe wurde nicht erlaubt oder ist blockiert.' : 'Standort konnte nicht bestimmt werden. Bitte draußen erneut testen.';
+      if (error.code === 1) {
+        dom.testLocationSteps.innerHTML = locationPermissionSteps().map(step => `<li>${esc(step)}</li>`).join('');
+        dom.testLocationHelp.classList.remove('hidden');
+        dom.testLocation.textContent = 'Nach Freigabe erneut testen';
+      }
+    }, {enableHighAccuracy:true,timeout:15000,maximumAge:0});
   }
 
   function openCapture(def, index) {
@@ -433,6 +464,17 @@
     queueTourSave(activeProblem.tourId); dom.problemDialog.close(); renderTour();
   });
   dom.retryLocation.addEventListener('click', locatePhone);
+  dom.testLocation.addEventListener('click', testPhoneLocation);
+  dom.testPhoto.addEventListener('change', () => {
+    const file = dom.testPhoto.files?.[0];
+    if (!file) return;
+    if (testPreviewUrl) URL.revokeObjectURL(testPreviewUrl);
+    testPreviewUrl = URL.createObjectURL(file);
+    dom.testPhotoPreview.src = testPreviewUrl;
+    dom.testPhotoPreview.classList.remove('hidden');
+    dom.testPhotoStatus.className = 'test-camera-status success';
+    dom.testPhotoStatus.textContent = `✓ Kamera funktioniert · Foto ausgewählt (${Math.max(1, Math.round(file.size / 1024))} KB) · nichts gespeichert`;
+  });
   dom.capturePhoto.addEventListener('change', async () => {
     const file = dom.capturePhoto.files?.[0]; if (!file) return;
     dom.captureError.classList.add('hidden'); dom.saveCapture.disabled = true; dom.saveCapture.textContent = 'Foto wird vorbereitet …';

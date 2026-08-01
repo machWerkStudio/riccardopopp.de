@@ -24,7 +24,7 @@ $csrf = (string)$_SESSION['csrf'];
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=4">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1">
-  <link rel="stylesheet" href="overrides.css?v=6">
+  <link rel="stylesheet" href="overrides.css?v=7">
 </head>
 <body class="<?= $authenticated ? 'app-mode' : 'login-mode' ?>">
 <?php if (!$authenticated): ?>
@@ -71,6 +71,26 @@ $csrf = (string)$_SESSION['csrf'];
       <div id="offlineNotice" class="notice hidden" role="status">Offline – Änderungen werden auf diesem Gerät vorgemerkt.</div>
       <div id="pendingNotice" class="notice hidden" role="status"></div>
       <div id="tourGroups"></div>
+
+      <section class="test-card" aria-labelledby="testTitle">
+        <span class="kicker">Gerätetest · Ibo · Kai · Riccardo</span>
+        <h2 id="testTitle">Vor dem Einsatz testen</h2>
+        <p>Hier können Standort und Kamera geprüft werden. Es werden keine Tourdaten und kein Plakat gespeichert.</p>
+        <div class="test-actions">
+          <button class="secondary-button full-button location-button" id="testLocationButton" type="button">Standort testen</button>
+          <label class="photo-picker test-photo-picker">Kamera testen
+            <input id="testPhotoInput" type="file" accept="image/*" capture="environment">
+          </label>
+        </div>
+        <div class="gps-status" id="testLocationStatus" aria-live="polite">Standort noch nicht getestet.</div>
+        <div class="permission-help hidden" id="testLocationHelp">
+          <strong>Standort ist im Browser blockiert</strong>
+          <ol id="testLocationSteps"></ol>
+          <p>Nach der Freigabe erneut auf „Standort testen“ tippen.</p>
+        </div>
+        <p class="test-camera-status" id="testCameraStatus" aria-live="polite">Kamera noch nicht getestet.</p>
+        <img id="testPhotoPreview" class="capture-preview hidden" alt="Vorschau des Testfotos">
+      </section>
     </section>
 
     <section id="tourView" class="view" aria-labelledby="tourTitle">
@@ -127,7 +147,7 @@ $csrf = (string)$_SESSION['csrf'];
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js?v=1" defer></script>
-  <script src="app.js?v=6" defer></script>
+  <script src="app.js?v=7" defer></script>
 <?php endif; ?>
 </body>
 </html>
