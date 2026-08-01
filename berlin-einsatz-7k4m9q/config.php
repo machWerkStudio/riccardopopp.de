@@ -40,3 +40,18 @@ function cleanText($value, int $maxLength = 500): string
     $text = trim((string)$value);
     return function_exists('mb_substr') ? mb_substr($text, 0, $maxLength) : substr($text, 0, $maxLength);
 }
+
+function createStateSnapshot(string $stateJson): void
+{
+    $snapshotDir = __DIR__ . '/data/snapshots';
+    if (!is_dir($snapshotDir) && !@mkdir($snapshotDir, 0750, true) && !is_dir($snapshotDir)) {
+        return;
+    }
+    $name = 'state-' . date('Ymd-His') . '-' . substr(hash('sha256', $stateJson), 0, 8) . '.json';
+    @file_put_contents($snapshotDir . '/' . $name, $stateJson, LOCK_EX);
+    $snapshots = glob($snapshotDir . '/state-*.json') ?: [];
+    rsort($snapshots, SORT_STRING);
+    foreach (array_slice($snapshots, 60) as $oldSnapshot) {
+        if (is_file($oldSnapshot)) @unlink($oldSnapshot);
+    }
+}

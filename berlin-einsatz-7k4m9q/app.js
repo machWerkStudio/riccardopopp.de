@@ -106,6 +106,7 @@
     try { pendingCount = (await pendingOperation('getAll')).length; } catch (_) { pendingCount = 0; }
     dom.pending.classList.toggle('hidden', pendingCount === 0);
     dom.pending.textContent = pendingCount ? `${pendingCount} Foto${pendingCount === 1 ? '' : 's'} wartet${pendingCount === 1 ? '' : 'en'} auf Synchronisierung.` : '';
+    if (dom.driver.value === 'Riccardo' && dom.overview.classList.contains('active')) renderOverview();
   }
 
   async function mergePendingMarkers() {
@@ -162,6 +163,26 @@
     return sum(state.tours[String(def.id)].sections.map(section => section.count));
   }
 
+  function storageControlMarkup() {
+    if (dom.driver.value !== 'Riccardo') return '';
+    const latest = {Ibo:null,Kai:null,Riccardo:null};
+    let confirmedCount = 0;
+    definitions.forEach(def => {
+      (state.tours[String(def.id)]?.markers || []).forEach(marker => {
+        if (marker.pending || !(marker.driver in latest)) return;
+        confirmedCount += 1;
+        const candidate = {...marker,tourId:def.id};
+        if (!latest[marker.driver] || String(candidate.capturedAt || '') > String(latest[marker.driver].capturedAt || '')) latest[marker.driver] = candidate;
+      });
+    });
+    const rows = ['Ibo','Kai','Riccardo'].map(driver => {
+      const marker = latest[driver];
+      const detail = marker ? `${new Date(marker.capturedAt).toLocaleString('de-DE')} · Tour ${marker.tourId}` : 'Noch kein bestätigter Plakatnachweis';
+      return `<div class="storage-driver"><i class="${driver.toLowerCase()}"></i><div><strong>${driver}</strong><span>${esc(detail)}</span></div><b>${marker ? '✓' : '–'}</b></div>`;
+    }).join('');
+    return `<section class="storage-control"><div class="section-heading"><div><span class="kicker">Nur für Riccardo</span><h2>Speicherkontrolle</h2></div><span class="storage-total">${confirmedCount}</span></div><p class="storage-summary">${pendingCount ? `⚠ Auf diesem Handy warten ${pendingCount} Foto${pendingCount === 1 ? '' : 's'} auf Übertragung.` : '✓ Auf diesem Handy sind keine Übertragungen offen.'}</p><div class="storage-drivers">${rows}</div><p class="snapshot-note">Automatische Sicherung aktiv: Nach jeder Serveränderung wird ein Wiederherstellungsstand erstellt. Die letzten 60 Stände bleiben erhalten.</p></section>`;
+  }
+
   function renderOverview() {
     const completed = totalCompleted();
     const percentage = Math.min(100, Math.round((completed / 500) * 100));
@@ -171,7 +192,8 @@
     const driverSelected = Boolean(dom.driver.value);
     const lastBackup = localStorage.getItem(backupKey);
     const backupMarkup = dom.driver.value === 'Riccardo' ? `<section class="backup-card"><div><span class="kicker">Datensicherung</span><h2>Vollständiges Einsatz-Backup</h2><p>${lastBackup ? `Letzter Download auf diesem Gerät: ${new Date(lastBackup).toLocaleString('de-DE')}` : 'Noch kein Backup auf diesem Gerät heruntergeladen.'}</p></div><a class="backup-button" id="backupDownload" href="backup.php" download>ZIP-Backup herunterladen ↓</a></section>` : '';
-    dom.groups.innerHTML = `${driverSelected ? '' : '<p class="priority-note">Bitte zuerst Ibo, Kai oder Riccardo als Fahrer auswählen.</p>'}${backupMarkup}${[1, 2].map(priority => {
+    const controlMarkup = storageControlMarkup();
+    dom.groups.innerHTML = `${driverSelected ? '' : '<p class="priority-note">Bitte zuerst Ibo, Kai oder Riccardo als Fahrer auswählen.</p>'}${controlMarkup}${backupMarkup}${[1, 2].map(priority => {
       const tours = definitions.filter(def => def.priority === priority).sort((a, b) => {
         const rank = {active:0, open:1, done:2};
         return rank[state.tours[String(a.id)].status] - rank[state.tours[String(b.id)].status] || a.id - b.id;

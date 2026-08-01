@@ -34,8 +34,8 @@ if (!isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK || $
     echo json_encode(['ok' => false, 'message' => 'Foto fehlt oder ist zu groß.']);
     exit;
 }
-$finfo = new finfo(FILEINFO_MIME_TYPE);
-$mime = $finfo->file($_FILES['photo']['tmp_name']);
+$imageInfo = @getimagesize($_FILES['photo']['tmp_name']);
+$mime = is_array($imageInfo) ? (string)($imageInfo['mime'] ?? '') : '';
 if (!in_array($mime, ['image/jpeg', 'image/webp'], true)) {
     http_response_code(422);
     echo json_encode(['ok' => false, 'message' => 'Nur JPEG- oder WebP-Fotos sind erlaubt.']);
@@ -93,4 +93,5 @@ $state['tours'][$tourKey]['updatedAt'] = date(DATE_ATOM);
 $state['updatedAt'] = date(DATE_ATOM);
 $encoded = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 rewind($handle); ftruncate($handle, 0); fwrite($handle, $encoded ?: '{}'); fflush($handle); flock($handle, LOCK_UN); fclose($handle);
+createStateSnapshot($encoded ?: '{}');
 echo json_encode(['ok' => true, 'marker' => $marker], JSON_UNESCAPED_UNICODE);

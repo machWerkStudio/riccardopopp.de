@@ -121,5 +121,6 @@ fwrite($handle, $encoded === false ? '{}' : $encoded);
 fflush($handle);
 flock($handle, LOCK_UN);
 fclose($handle);
+createStateSnapshot($encoded === false ? '{}' : $encoded);
 
 echo json_encode(['ok' => true, 'state' => $state], JSON_UNESCAPED_UNICODE);
