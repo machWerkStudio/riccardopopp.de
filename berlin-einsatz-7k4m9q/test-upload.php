@@ -18,26 +18,35 @@ function testResponse(int $status, array $payload): void
 $testStage = 'Start';
 set_exception_handler(static function (Throwable $error) use (&$testStage): void {
     error_log('Testupload: ' . $error->getMessage());
-    testResponse(500, ['ok' => false, 'message' => 'Serverfehler beim Speichertest – Schritt: ' . $testStage . '.']);
+    $detail = str_replace(__DIR__, '[App]', $error->getMessage());
+    $detail = function_exists('mb_substr') ? mb_substr($detail, 0, 180) : substr($detail, 0, 180);
+    testResponse(500, ['ok' => false, 'message' => 'Serverfehler – Schritt: ' . $testStage . ' · ' . get_class($error) . ': ' . $detail]);
 });
 
+$testStage = 'Anfragemethode prüfen';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     testResponse(405, ['ok' => false, 'message' => 'Methode nicht erlaubt.']);
 }
+$testStage = 'Sicherheitswert prüfen';
 if (!hash_equals((string)($_SESSION['csrf'] ?? ''), (string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''))) {
     testResponse(403, ['ok' => false, 'message' => 'Sicherheitsprüfung fehlgeschlagen.']);
 }
 
+$testStage = 'Fahrer lesen';
 $driver = cleanText($_POST['driver'] ?? '', 20);
+$testStage = 'Standortwerte lesen';
 $lat = filter_var($_POST['lat'] ?? null, FILTER_VALIDATE_FLOAT);
 $lng = filter_var($_POST['lng'] ?? null, FILTER_VALIDATE_FLOAT);
 $accuracy = filter_var($_POST['accuracy'] ?? null, FILTER_VALIDATE_FLOAT);
+$testStage = 'Fahrer prüfen';
 if (!in_array($driver, ['Ibo', 'Kai', 'Riccardo'], true)) {
     testResponse(422, ['ok' => false, 'message' => 'Bitte einen gültigen Fahrer auswählen.']);
 }
+$testStage = 'Standortwerte prüfen';
 if ($lat === false || $lng === false || abs((float)$lat) > 90 || abs((float)$lng) > 180 || $accuracy === false || (float)$accuracy < 0) {
     testResponse(422, ['ok' => false, 'message' => 'Die Test-Standortdaten sind ungültig.']);
 }
+$testStage = 'Fotoupload prüfen';
 if (!isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK || $_FILES['photo']['size'] > 3500000) {
     testResponse(422, ['ok' => false, 'message' => 'Testfoto fehlt oder ist zu groß.']);
 }
