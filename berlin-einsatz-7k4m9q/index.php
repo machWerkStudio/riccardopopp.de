@@ -24,7 +24,7 @@ $csrf = (string)$_SESSION['csrf'];
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css?v=4">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1">
-  <link rel="stylesheet" href="overrides.css?v=12">
+  <link rel="stylesheet" href="overrides.css?v=13">
 </head>
 <body class="<?= $authenticated ? 'app-mode' : 'login-mode' ?>">
 <?php if (!$authenticated): ?>
@@ -108,7 +108,7 @@ $csrf = (string)$_SESSION['csrf'];
     <button class="primary-button" id="finishTourButton" type="button">Tour abschließen</button>
   </nav>
 
-  <button class="chat-fab" id="chatOpenButton" type="button" aria-label="Fahrerchat öffnen" title="Fahrerchat öffnen">Chat <span class="hidden" id="chatUnreadBadge">0</span></button>
+  <button class="chat-fab" id="chatOpenButton" type="button" aria-label="Fahrerchat öffnen" title="Fahrerchat öffnen"><span class="chat-fab-icon" aria-hidden="true">💬</span> Chat <span class="hidden" id="chatUnreadBadge">0</span></button>
 
   <dialog id="chatDialog" class="chat-dialog">
     <div class="dialog-card chat-card">
@@ -169,7 +169,7 @@ $csrf = (string)$_SESSION['csrf'];
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js?v=1" defer></script>
-  <script src="app.js?v=12" defer></script>
+  <script src="app.js?v=13" defer></script>
 <?php endif; ?>
 </body>
 </html>
