@@ -15,9 +15,10 @@ function testResponse(int $status, array $payload): void
     exit;
 }
 
-set_exception_handler(static function (Throwable $error): void {
+$testStage = 'Start';
+set_exception_handler(static function (Throwable $error) use (&$testStage): void {
     error_log('Testupload: ' . $error->getMessage());
-    testResponse(500, ['ok' => false, 'message' => 'Serverfehler beim Speichertest. Bitte test-upload.php erneut hochladen.']);
+    testResponse(500, ['ok' => false, 'message' => 'Serverfehler beim Speichertest – Schritt: ' . $testStage . '.']);
 });
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -41,21 +42,15 @@ if (!isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK || $
     testResponse(422, ['ok' => false, 'message' => 'Testfoto fehlt oder ist zu groß.']);
 }
 
-$mime = '';
-if (class_exists('finfo')) {
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $mime = (string)$finfo->file($_FILES['photo']['tmp_name']);
-} elseif (function_exists('mime_content_type')) {
-    $mime = (string)mime_content_type($_FILES['photo']['tmp_name']);
-} elseif (function_exists('getimagesize')) {
-    $imageInfo = getimagesize($_FILES['photo']['tmp_name']);
-    $mime = is_array($imageInfo) ? (string)($imageInfo['mime'] ?? '') : '';
-}
+$testStage = 'Testfoto prüfen';
+$imageInfo = @getimagesize($_FILES['photo']['tmp_name']);
+$mime = is_array($imageInfo) ? (string)($imageInfo['mime'] ?? '') : '';
 if (!in_array($mime, ['image/jpeg', 'image/webp'], true)) {
     testResponse(422, ['ok' => false, 'message' => 'Nur JPEG- oder WebP-Testfotos sind erlaubt.']);
 }
 
 $testDir = __DIR__ . '/data/tests';
+$testStage = 'Testordner anlegen';
 if (!is_dir($testDir) && !mkdir($testDir, 0750, true) && !is_dir($testDir)) {
     testResponse(500, ['ok' => false, 'message' => 'Der Testordner konnte nicht angelegt werden.']);
 }
@@ -64,13 +59,13 @@ $driverKey = strtolower($driver);
 $extension = $mime === 'image/webp' ? 'webp' : 'jpg';
 $photoName = $driverKey . '.' . $extension;
 $photoPath = $testDir . '/' . $photoName;
-$temporaryPath = $testDir . '/.' . $driverKey . '-' . bin2hex(random_bytes(6)) . '.tmp';
-if (!move_uploaded_file($_FILES['photo']['tmp_name'], $temporaryPath) || !rename($temporaryPath, $photoPath)) {
-    @unlink($temporaryPath);
+$testStage = 'Testfoto speichern';
+if (!move_uploaded_file($_FILES['photo']['tmp_name'], $photoPath)) {
     testResponse(500, ['ok' => false, 'message' => 'Das Testfoto konnte nicht gespeichert werden.']);
 }
 
 $resultsPath = $testDir . '/results.json';
+$testStage = 'Ergebnisdatei öffnen';
 $handle = fopen($resultsPath, 'c+');
 if ($handle === false || !flock($handle, LOCK_EX)) {
     testResponse(500, ['ok' => false, 'message' => 'Das Testergebnis konnte nicht gesperrt werden.']);
@@ -89,6 +84,7 @@ $results[$driver] = [
     'photo' => $photoName,
     'bytes' => (int)filesize($photoPath),
 ];
+$testStage = 'Ergebnisdatei schreiben';
 $encoded = json_encode($results, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 rewind($handle);
 ftruncate($handle, 0);
