@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 const ACCESS_CODE_HASH = '4883e712986aad09ddd0110495e39bbd7f12eab87dccc3864e5656cf5be728ac';
+const BACKUP_CODE_HASH = '1a8c44cbfd4512e76a66dfdd1badc24fe55599cdf2890dca76dc86d9de86084e';
 const DATA_FILE = __DIR__ . '/data/state.json';
 
 function startSecureSession(): void

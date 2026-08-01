@@ -22,8 +22,9 @@ $csrf = (string)$_SESSION['csrf'];
   <meta name="theme-color" content="#111827">
   <title>Plakatierung Berlin – Einsatz</title>
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="styles.css?v=3">
-  <link rel="stylesheet" href="overrides.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css?v=1">
+  <link rel="stylesheet" href="overrides.css?v=6">
 </head>
 <body class="<?= $authenticated ? 'app-mode' : 'login-mode' ?>">
 <?php if (!$authenticated): ?>
@@ -109,7 +110,12 @@ $csrf = (string)$_SESSION['csrf'];
       <div class="section-heading"><div><span class="kicker">Plakatnachweis</span><h2>Standort und Foto</h2></div><button class="icon-button" value="cancel" aria-label="Schließen">×</button></div>
       <p id="captureStreet"></p>
       <div class="gps-status" id="gpsStatus">Standort wird ermittelt …</div>
-      <button class="secondary-button full-button" id="retryLocationButton" type="button">Standort erneut bestimmen</button>
+      <div class="permission-help hidden" id="locationPermissionHelp">
+        <strong>Standort ist im Browser blockiert</strong>
+        <ol id="locationPermissionSteps"></ol>
+        <p>Danach zu dieser Seite zurückkehren und unten erneut prüfen.</p>
+      </div>
+      <button class="secondary-button full-button location-button" id="retryLocationButton" type="button">Standortfreigabe anfragen</button>
       <label class="photo-picker">Foto aufnehmen
         <input id="capturePhoto" type="file" accept="image/*" capture="environment">
       </label>
@@ -120,7 +126,8 @@ $csrf = (string)$_SESSION['csrf'];
     </form>
   </dialog>
 
-  <script src="app.js?v=3" defer></script>
+  <script src="vendor/leaflet/leaflet.js?v=1" defer></script>
+  <script src="app.js?v=6" defer></script>
 <?php endif; ?>
 </body>
 </html>

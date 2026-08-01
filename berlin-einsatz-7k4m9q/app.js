@@ -7,6 +7,7 @@
   const csrf = app.dataset.csrf;
   const localKey = 'berlin-einsatz-backup-v1';
   const driverKey = 'berlin-einsatz-driver-v1';
+  const backupKey = 'berlin-einsatz-last-backup-v1';
   const problemTypes = ['Keine freie Fläche', 'Pfosten / Halterung beschädigt', 'Abschnitt nicht zugänglich', 'Ordnungsamt / Polizei', 'Sonstige Besonderheit'];
   const dom = {
     overview: document.querySelector('#overviewView'), tour: document.querySelector('#tourView'), groups: document.querySelector('#tourGroups'),
@@ -19,7 +20,7 @@
     problemNote: document.querySelector('#problemNote'), saveProblem: document.querySelector('#saveProblemButton'),
     finishDialog: document.querySelector('#finishDialog'), finishCheck: document.querySelector('#finishCheck'), finishNote: document.querySelector('#finishNote'), confirmFinish: document.querySelector('#confirmFinishButton'),
     captureDialog: document.querySelector('#captureDialog'), captureStreet: document.querySelector('#captureStreet'), gpsStatus: document.querySelector('#gpsStatus'),
-    retryLocation: document.querySelector('#retryLocationButton'), capturePhoto: document.querySelector('#capturePhoto'), capturePreview: document.querySelector('#capturePreview'),
+    retryLocation: document.querySelector('#retryLocationButton'), locationHelp: document.querySelector('#locationPermissionHelp'), locationSteps: document.querySelector('#locationPermissionSteps'), capturePhoto: document.querySelector('#capturePhoto'), capturePreview: document.querySelector('#capturePreview'),
     captureNote: document.querySelector('#captureNote'), captureError: document.querySelector('#captureError'), saveCapture: document.querySelector('#saveCaptureButton')
   };
 
@@ -35,6 +36,7 @@
   let captureBlob = null;
   let capturePreviewUrl = '';
   let pendingCount = 0;
+  let tourMarkerMap = null;
 
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const now = () => new Date().toISOString();
@@ -161,7 +163,9 @@
     dom.percent.textContent = `${percentage}%`;
     dom.ring.style.setProperty('--p', percentage);
     const driverSelected = Boolean(dom.driver.value);
-    dom.groups.innerHTML = `${driverSelected ? '' : '<p class="priority-note">Bitte zuerst Ibo, Kai oder Riccardo als Fahrer auswählen.</p>'}${[1, 2].map(priority => {
+    const lastBackup = localStorage.getItem(backupKey);
+    const backupMarkup = dom.driver.value === 'Riccardo' ? `<section class="backup-card"><div><span class="kicker">Datensicherung</span><h2>Vollständiges Einsatz-Backup</h2><p>${lastBackup ? `Letzter Download auf diesem Gerät: ${new Date(lastBackup).toLocaleString('de-DE')}` : 'Noch kein Backup auf diesem Gerät heruntergeladen.'}</p></div><a class="backup-button" id="backupDownload" href="backup.php" download>ZIP-Backup herunterladen ↓</a></section>` : '';
+    dom.groups.innerHTML = `${driverSelected ? '' : '<p class="priority-note">Bitte zuerst Ibo, Kai oder Riccardo als Fahrer auswählen.</p>'}${backupMarkup}${[1, 2].map(priority => {
       const tours = definitions.filter(def => def.priority === priority).sort((a, b) => {
         const rank = {active:0, open:1, done:2};
         return rank[state.tours[String(a.id)].status] - rank[state.tours[String(b.id)].status] || a.id - b.id;
@@ -175,6 +179,8 @@
       }).join('')}</section>`;
     }).join('')}`;
     dom.groups.querySelectorAll('[data-tour-id]').forEach(button => button.addEventListener('click', () => openTour(Number(button.dataset.tourId))));
+    const backupDownload = document.querySelector('#backupDownload');
+    if (backupDownload) backupDownload.addEventListener('click', () => { localStorage.setItem(backupKey, now()); setTimeout(renderOverview, 300); });
   }
 
   function renderTour() {
@@ -183,16 +189,43 @@
     const tourState = state.tours[String(def.id)];
     const completed = tourCompleted(def);
     const percentage = Math.min(100, Math.round((completed / def.target) * 100));
+    const driverCounts = {Kai:0,Ibo:0,Riccardo:0};
+    tourState.markers.forEach(marker => { if (marker.driver in driverCounts) driverCounts[marker.driver] += 1; });
     dom.tourProgressText.textContent = `${completed} von ${def.target}`;
     dom.tourProgressBar.style.width = `${percentage}%`;
+    if (tourMarkerMap) { tourMarkerMap.remove(); tourMarkerMap = null; }
     dom.content.innerHTML = `
       <section class="tour-hero"><span class="priority-chip priority-${def.priority}">Priorität ${def.priority}</span><h1 id="tourTitle">Tour ${def.id}: ${esc(def.name)}</h1><div class="tour-meta"><div><span>Start</span><strong>${esc(def.start)}</strong></div><div><span>Ende</span><strong>${esc(def.end)}</strong></div><div><span>Soll</span><strong>${def.target}</strong></div></div><a class="navigate-button" href="${mapUrl(def.start,def.end)}" target="_blank" rel="noopener">Navigation starten ↗</a></section>
       <section class="route-card"><span class="kicker">Arbeitshinweis</span><p class="hint">${esc(def.hint)}</p></section>
       <div>${def.streets.map((street,index) => streetCard(def, street, index, tourState.sections[index])).join('')}</div>
-      <section class="map-card"><details><summary>Kartenausschnitt anzeigen</summary><img src="${esc(def.map)}" alt="Kartenausschnitt für Tour ${def.id}" loading="lazy"></details></section>
+      <section class="live-map-card"><div class="section-heading"><div><span class="kicker">Standortkarte</span><h2>Markierte Plakate</h2></div><strong>${tourState.markers.length}</strong></div><div class="driver-legend"><span><i class="kai"></i>Kai ${driverCounts.Kai}</span><span><i class="ibo"></i>Ibo ${driverCounts.Ibo}</span><span><i class="riccardo"></i>Riccardo ${driverCounts.Riccardo}</span></div>${tourState.markers.length ? '<div id="tourMarkerMap" class="tour-marker-map" aria-label="Karte mit allen markierten Plakaten dieser Tour"></div>' : '<p class="empty-map">Noch keine Plakate mit GPS-Standort erfasst.</p>'}</section>
+      <section class="map-card"><details><summary>Geplanten Kartenausschnitt anzeigen</summary><img src="${esc(def.map)}" alt="Kartenausschnitt für Tour ${def.id}" loading="lazy"></details></section>
       ${tourState.markers.length ? `<section class="route-card"><span class="kicker">Erfasste Standorte</span><h2>${tourState.markers.length} Plakatnachweise</h2><div class="marker-list">${tourState.markers.slice().reverse().map(marker => markerCard(marker, def)).join('')}</div></section>` : ''}
       ${tourState.status === 'done' ? `<div class="finished-banner">✓ Tour abgeschlossen${tourState.finishedAt ? ` · ${new Date(tourState.finishedAt).toLocaleString('de-DE')}` : ''}</div>` : ''}`;
     bindTourControls(def);
+    if (tourState.markers.length) requestAnimationFrame(() => initTourMarkerMap(def, tourState.markers));
+  }
+
+  function initTourMarkerMap(def, markers) {
+    const container = document.querySelector('#tourMarkerMap');
+    if (!container || typeof L === 'undefined' || container._leaflet_id) return;
+    const colors = {Kai:'#2563eb',Ibo:'#16a34a',Riccardo:'#dc2626'};
+    const order = {Kai:0,Ibo:1,Riccardo:2};
+    const valid = markers.filter(marker => Number.isFinite(Number(marker.lat)) && Number.isFinite(Number(marker.lng))).slice().sort((a,b) => (order[a.driver] ?? 9) - (order[b.driver] ?? 9));
+    if (!valid.length) return;
+    tourMarkerMap = L.map(container,{scrollWheelZoom:false,zoomControl:true});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap-Mitwirkende'}).addTo(tourMarkerMap);
+    const bounds = [];
+    valid.forEach(marker => {
+      const lat = Number(marker.lat), lng = Number(marker.lng), street = def.streets[Number(marker.sectionIndex)]?.name || `Abschnitt ${Number(marker.sectionIndex)+1}`;
+      const photo = marker.photo ? `<img class="map-popup-photo" src="photo.php?file=${encodeURIComponent(marker.photo)}" alt="Plakatfoto">` : '';
+      const popup = `${photo}<strong>${esc(marker.driver || 'Fahrer unbekannt')}</strong><span>${esc(street)}</span><small>${marker.capturedAt ? new Date(marker.capturedAt).toLocaleString('de-DE') : ''} · ±${Math.round(Number(marker.accuracy)||0)} m</small>${marker.note ? `<p>${esc(marker.note)}</p>` : ''}`;
+      L.circleMarker([lat,lng],{radius:9,color:'#fff',weight:3,fillColor:colors[marker.driver]||'#64748b',fillOpacity:1}).addTo(tourMarkerMap).bindPopup(popup,{maxWidth:240});
+      bounds.push([lat,lng]);
+    });
+    if (bounds.length === 1) tourMarkerMap.setView(bounds[0],17);
+    else tourMarkerMap.fitBounds(bounds,{padding:[28,28],maxZoom:17});
+    setTimeout(() => tourMarkerMap?.invalidateSize(),100);
   }
 
   function streetCard(def, street, index, section) {
@@ -236,6 +269,7 @@
   }
 
   function closeTour() {
+    if (tourMarkerMap) { tourMarkerMap.remove(); tourMarkerMap = null; }
     activeTourId = null; dom.tour.classList.remove('active'); dom.overview.classList.add('active'); dom.bottom.classList.add('hidden');
     renderOverview(); window.scrollTo(0,0); history.replaceState(null,'',window.location.pathname);
   }
@@ -252,8 +286,38 @@
     dom.problemDialog.showModal();
   }
 
+  function showLocationPermissionHelp() {
+    const android = /Android/i.test(navigator.userAgent);
+    const steps = android
+      ? ['Links neben der Adresse auf das Seiteninfo-Symbol tippen.', '„Berechtigungen“ öffnen.', 'Bei „Standort“ die Einstellung „Zulassen“ wählen.', 'Falls dort nichts angezeigt wird: Chrome-Menü → Einstellungen → Website-Einstellungen → Standort öffnen.']
+      : ['Links in der Safari-Adressleiste auf das Seitenmenü tippen.', '„Mehr“ und anschließend die Website-Einstellungen öffnen.', 'Bei „Standort“ die Einstellung „Erlauben“ oder „Fragen“ wählen.', 'Falls nötig: iPhone-Einstellungen → Apps → Safari → Standort öffnen.'];
+    dom.locationSteps.innerHTML = steps.map(step => `<li>${esc(step)}</li>`).join('');
+    dom.locationHelp.classList.remove('hidden');
+    dom.retryLocation.textContent = 'Nach Freigabe erneut prüfen';
+  }
+
+  async function prepareLocationPermission() {
+    dom.locationHelp.classList.add('hidden');
+    dom.retryLocation.textContent = 'Standortfreigabe anfragen';
+    if (!navigator.geolocation) {
+      dom.gpsStatus.className = 'gps-status error'; dom.gpsStatus.textContent = 'Standortermittlung wird von diesem Browser nicht unterstützt.'; return;
+    }
+    try {
+      if (navigator.permissions?.query) {
+        const permission = await navigator.permissions.query({name:'geolocation'});
+        if (permission.state === 'denied') {
+          dom.gpsStatus.className = 'gps-status error'; dom.gpsStatus.textContent = 'Standortfreigabe ist für diese Seite blockiert.'; showLocationPermissionHelp(); return;
+        }
+        permission.onchange = () => { if (permission.state === 'granted') locatePhone(); else if (permission.state === 'denied') showLocationPermissionHelp(); };
+      }
+    } catch (_) {}
+    locatePhone();
+  }
+
   function locatePhone() {
     capturePosition = null;
+    dom.locationHelp.classList.add('hidden');
+    dom.retryLocation.textContent = 'Standort erneut bestimmen';
     dom.gpsStatus.className = 'gps-status loading';
     dom.gpsStatus.textContent = 'Standort wird ermittelt …';
     if (!navigator.geolocation) {
@@ -261,11 +325,13 @@
     }
     navigator.geolocation.getCurrentPosition(position => {
       capturePosition = {lat:position.coords.latitude,lng:position.coords.longitude,accuracy:position.coords.accuracy};
+      dom.locationHelp.classList.add('hidden');
       dom.gpsStatus.className = `gps-status ${position.coords.accuracy > 35 ? 'warning' : 'success'}`;
       dom.gpsStatus.textContent = `Standort gefunden · Genauigkeit ±${Math.round(position.coords.accuracy)} Meter${position.coords.accuracy > 35 ? ' – erneute Messung empfohlen' : ''}`;
     }, error => {
       dom.gpsStatus.className = 'gps-status error';
-      dom.gpsStatus.textContent = error.code === 1 ? 'Standortfreigabe wurde nicht erlaubt.' : 'Standort konnte nicht bestimmt werden.';
+      dom.gpsStatus.textContent = error.code === 1 ? 'Standortfreigabe wurde nicht erlaubt oder ist blockiert.' : 'Standort konnte nicht bestimmt werden.';
+      if (error.code === 1) showLocationPermissionHelp();
     }, {enableHighAccuracy:true,timeout:15000,maximumAge:5000});
   }
 
@@ -274,7 +340,7 @@
     if (capturePreviewUrl) URL.revokeObjectURL(capturePreviewUrl);
     capturePreviewUrl = ''; dom.capturePreview.classList.add('hidden'); dom.capturePhoto.value = ''; dom.captureNote.value = '';
     dom.captureError.classList.add('hidden'); dom.captureStreet.textContent = def.streets[index].name;
-    dom.captureDialog.showModal(); locatePhone();
+    dom.captureDialog.showModal(); prepareLocationPermission();
   }
 
   async function compressPhoto(file) {
