@@ -1,0 +1,5 @@
+# Local operational exports and backups (contain photos and GPS data)
+/live-touren-download/
+
+# macOS metadata
+.DS_Store

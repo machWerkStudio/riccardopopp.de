@@ -74,7 +74,7 @@ if ($section === 'meta') {
     ];
 } else {
     $tourId = (int)($input['tourId'] ?? 0);
-    if ($tourId < 1 || $tourId > 11) {
+    if ($tourId < 1 || $tourId > 12) {
         flock($handle, LOCK_UN);
         fclose($handle);
         http_response_code(422);

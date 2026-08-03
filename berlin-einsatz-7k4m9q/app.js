@@ -47,6 +47,7 @@
   let testPhotoBlob = null;
   let pendingCount = 0;
   let tourMarkerMap = null;
+  let pankowImageMap = null;
   let chatMessages = [];
   let chatRefreshing = false;
 
@@ -190,6 +191,7 @@
   }
 
   function renderOverview() {
+    if (pankowImageMap) { pankowImageMap.remove(); pankowImageMap = null; }
     const completed = totalCompleted();
     const percentage = Math.min(100, Math.round((completed / 500) * 100));
     dom.totalDone.textContent = completed;
@@ -199,22 +201,47 @@
     const lastBackup = localStorage.getItem(backupKey);
     const backupMarkup = dom.driver.value === 'Riccardo' ? `<section class="backup-card"><div><span class="kicker">Datensicherung</span><h2>Vollständiges Einsatz-Backup</h2><p>${lastBackup ? `Letzter Download auf diesem Gerät: ${new Date(lastBackup).toLocaleString('de-DE')}` : 'Noch kein Backup auf diesem Gerät heruntergeladen.'}</p></div><a class="backup-button" id="backupDownload" href="backup.php" download>ZIP-Backup herunterladen ↓</a></section>` : '';
     const controlMarkup = storageControlMarkup();
-    dom.groups.innerHTML = `${driverSelected ? '' : '<p class="priority-note">Bitte zuerst Ibo, Kai oder Riccardo als Fahrer auswählen.</p>'}${controlMarkup}${backupMarkup}${[1, 2].map(priority => {
+    const pankowMapMarkup = `<section class="pankow-overview-card"><div class="section-heading"><div><span class="kicker">Gesamtübersicht · Stand 03.08.2026</span><h2>Alle Plakatstandorte in Pankow</h2></div><span class="pankow-map-total">308</span></div><div class="driver-legend"><span><i class="ibo"></i>Ibo 111</span><span><i class="kai"></i>Kai 100</span><span><i class="riccardo"></i>Riccardo 97</span></div><button class="pankow-map-image" id="pankowMapOpen" type="button" aria-label="Hochauflösende Pankow-Karte im Vollbild öffnen"><img src="pankow-gesamtkarte.jpg" alt="OpenStreetMap-Karte des Bezirks Pankow mit 308 farblich nach Fahrer markierten Plakatstandorten" loading="lazy"><span>Karte im Vollbild öffnen</span></button><a class="pankow-print-button" href="pankow-plakatstandorte-a4.pdf" target="_blank" rel="noopener">A4-PDF drucken ↗</a></section><dialog class="pankow-map-dialog" id="pankowMapDialog" aria-label="Hochauflösende Gesamtkarte Pankow"><div class="pankow-map-toolbar"><div><strong>Gesamtkarte Pankow</strong><span>Mit zwei Fingern zoomen und verschieben</span></div><button id="pankowMapClose" type="button" aria-label="Karte schließen">×</button></div><div class="pankow-image-map" id="pankowImageMap"></div></dialog>`;
+    dom.groups.innerHTML = `${driverSelected ? '' : '<p class="priority-note">Bitte zuerst Ibo, Kai oder Riccardo als Fahrer auswählen.</p>'}${controlMarkup}${backupMarkup}${pankowMapMarkup}${[1, 2, 3].map(priority => {
       const tours = definitions.filter(def => def.priority === priority).sort((a, b) => {
         const rank = {active:0, open:1, done:2};
         return rank[state.tours[String(a.id)].status] - rank[state.tours[String(b.id)].status] || a.id - b.id;
       });
       const target = sum(tours.map(tour => tour.target));
-      return `<section><div class="group-heading"><h2>Priorität ${priority}</h2><span class="priority-chip priority-${priority}">${target} Plakate</span></div>${tours.map(def => {
+      const groupTitle = priority === 3 ? 'Abschlusstour' : `Priorität ${priority}`;
+      const groupTarget = priority === 3 ? 'Flexible Erfassung' : `${target} Plakate`;
+      return `<section class="${priority === 3 ? 'final-tour-group' : ''}"><div class="group-heading"><h2>${groupTitle}</h2><span class="priority-chip priority-${priority}">${groupTarget}</span></div>${tours.map(def => {
         const tourState = state.tours[String(def.id)];
         const count = tourCompleted(def);
         const statusText = tourState.status === 'done' ? 'Fertig' : tourState.status === 'active' ? 'Läuft' : 'Offen';
-        return `<button class="tour-card ${tourState.status === 'done' ? 'done' : ''} ${tourState.status === 'active' ? 'active-tour' : ''}" data-tour-id="${def.id}" type="button" ${driverSelected ? '' : 'disabled aria-disabled="true"'}><div><span class="status-chip priority-${def.priority}">${driverSelected ? statusText : 'Fahrer wählen'}</span><h3>Tour ${def.id}: ${esc(def.name)}</h3><p>${count} von ${def.target} Plakaten</p></div><span class="number">${def.id}</span></button>`;
+        const countText = def.flexible ? `${count} Plakat${count === 1 ? '' : 'e'} erfasst` : `${count} von ${def.target} Plakaten`;
+        return `<button class="tour-card ${def.flexible ? 'flexible-tour' : ''} ${tourState.status === 'done' ? 'done' : ''} ${tourState.status === 'active' ? 'active-tour' : ''}" data-tour-id="${def.id}" type="button" ${driverSelected ? '' : 'disabled aria-disabled="true"'}><div><span class="status-chip priority-${def.priority}">${driverSelected ? statusText : 'Fahrer wählen'}</span><h3>Tour ${def.id}: ${esc(def.name)}</h3><p>${countText}</p></div><span class="number">${def.id}</span></button>`;
       }).join('')}</section>`;
     }).join('')}`;
     dom.groups.querySelectorAll('[data-tour-id]').forEach(button => button.addEventListener('click', () => openTour(Number(button.dataset.tourId))));
     const backupDownload = document.querySelector('#backupDownload');
     if (backupDownload) backupDownload.addEventListener('click', () => { localStorage.setItem(backupKey, now()); setTimeout(renderOverview, 300); });
+    const pankowMapOpen = document.querySelector('#pankowMapOpen');
+    const pankowMapDialog = document.querySelector('#pankowMapDialog');
+    const pankowMapClose = document.querySelector('#pankowMapClose');
+    if (pankowMapOpen && pankowMapDialog) pankowMapOpen.addEventListener('click', () => {
+      pankowMapDialog.showModal();
+      requestAnimationFrame(initPankowImageMap);
+    });
+    if (pankowMapClose && pankowMapDialog) pankowMapClose.addEventListener('click', () => pankowMapDialog.close());
+    if (pankowMapDialog) pankowMapDialog.addEventListener('close', () => { if (pankowImageMap) { pankowImageMap.remove(); pankowImageMap = null; } });
+  }
+
+  function initPankowImageMap() {
+    const container = document.querySelector('#pankowImageMap');
+    if (!container || typeof L === 'undefined' || pankowImageMap) return;
+    const imageWidth = 2339, imageHeight = 1654;
+    const bounds = [[0, 0], [imageHeight, imageWidth]];
+    pankowImageMap = L.map(container, {crs:L.CRS.Simple,minZoom:-2,maxZoom:4,zoomSnap:.25,zoomDelta:.5,scrollWheelZoom:true,doubleClickZoom:true,boxZoom:false,attributionControl:false});
+    L.imageOverlay('pankow-gesamtkarte-hochaufloesend.jpg', bounds, {interactive:false}).addTo(pankowImageMap);
+    pankowImageMap.fitBounds(bounds, {padding:[0,0]});
+    pankowImageMap.setMaxBounds([[-500,-500],[imageHeight+500,imageWidth+500]]);
+    setTimeout(() => pankowImageMap?.invalidateSize(), 100);
   }
 
   function renderTour() {
@@ -222,18 +249,18 @@
     if (!def) return;
     const tourState = state.tours[String(def.id)];
     const completed = tourCompleted(def);
-    const percentage = Math.min(100, Math.round((completed / def.target) * 100));
+    const percentage = def.flexible ? (completed ? 100 : 0) : Math.min(100, Math.round((completed / def.target) * 100));
     const driverCounts = {Kai:0,Ibo:0,Riccardo:0};
     tourState.markers.forEach(marker => { if (marker.driver in driverCounts) driverCounts[marker.driver] += 1; });
-    dom.tourProgressText.textContent = `${completed} von ${def.target}`;
+    dom.tourProgressText.textContent = def.flexible ? `${completed} erfasst` : `${completed} von ${def.target}`;
     dom.tourProgressBar.style.width = `${percentage}%`;
     if (tourMarkerMap) { tourMarkerMap.remove(); tourMarkerMap = null; }
     dom.content.innerHTML = `
-      <section class="tour-hero"><span class="priority-chip priority-${def.priority}">Priorität ${def.priority}</span><h1 id="tourTitle">Tour ${def.id}: ${esc(def.name)}</h1><div class="tour-meta"><div><span>Start</span><strong>${esc(def.start)}</strong></div><div><span>Ende</span><strong>${esc(def.end)}</strong></div><div><span>Soll</span><strong>${def.target}</strong></div></div><a class="navigate-button" href="${mapUrl(def.start,def.end)}" target="_blank" rel="noopener" aria-label="Tour mit Google Maps navigieren">Mit Google Maps navigieren ↗</a></section>
+      <section class="tour-hero ${def.flexible ? 'flexible-tour-hero' : ''}"><span class="priority-chip priority-${def.priority}">${def.flexible ? 'Flexible Abschlusstour' : `Priorität ${def.priority}`}</span><h1 id="tourTitle">Tour ${def.id}: ${esc(def.name)}</h1><div class="tour-meta"><div><span>Gebiet</span><strong>${esc(def.start)}</strong></div><div><span>Erfasst</span><strong>${completed}</strong></div><div><span>Soll</span><strong>${def.flexible ? 'Offen' : def.target}</strong></div></div><a class="navigate-button" href="${def.flexible ? streetUrl('Bezirk Pankow') : mapUrl(def.start,def.end)}" target="_blank" rel="noopener" aria-label="${def.flexible ? 'Bezirk Pankow' : 'Tour'} mit Google Maps öffnen">Mit Google Maps öffnen ↗</a></section>
       <section class="route-card"><span class="kicker">Arbeitshinweis</span><p class="hint">${esc(def.hint)}</p></section>
       <div>${def.streets.map((street,index) => streetCard(def, street, index, tourState.sections[index])).join('')}</div>
       <section class="live-map-card"><div class="section-heading"><div><span class="kicker">Standortkarte</span><h2>Markierte Plakate</h2></div><strong>${tourState.markers.length}</strong></div><div class="driver-legend"><span><i class="kai"></i>Kai ${driverCounts.Kai}</span><span><i class="ibo"></i>Ibo ${driverCounts.Ibo}</span><span><i class="riccardo"></i>Riccardo ${driverCounts.Riccardo}</span></div>${tourState.markers.length ? '<div id="tourMarkerMap" class="tour-marker-map" aria-label="Karte mit allen markierten Plakaten dieser Tour"></div>' : '<p class="empty-map">Noch keine Plakate mit GPS-Standort erfasst.</p>'}</section>
-      <section class="map-card"><details><summary>Geplanten Kartenausschnitt anzeigen</summary><img src="${esc(def.map)}" alt="Kartenausschnitt für Tour ${def.id}" loading="lazy"></details></section>
+      ${def.map ? `<section class="map-card"><details><summary>Geplanten Kartenausschnitt anzeigen</summary><img src="${esc(def.map)}" alt="Kartenausschnitt für Tour ${def.id}" loading="lazy"></details></section>` : ''}
       ${tourState.markers.length ? `<section class="route-card"><span class="kicker">Erfasste Standorte</span><h2>${tourState.markers.length} Plakatnachweise</h2><div class="marker-list">${tourState.markers.slice().reverse().map(marker => markerCard(marker, def)).join('')}</div></section>` : ''}
       ${tourState.status === 'done' ? `<div class="finished-banner">✓ Tour abgeschlossen${tourState.finishedAt ? ` · ${new Date(tourState.finishedAt).toLocaleString('de-DE')}` : ''}</div>` : ''}`;
     bindTourControls(def);
@@ -264,7 +291,8 @@
 
   function streetCard(def, street, index, section) {
     const markerCount = state.tours[String(def.id)].markers.filter(marker => Number(marker.sectionIndex) === index).length;
-    return `<section class="street-card ${section.done ? 'done' : ''}" data-section="${index}"><div class="street-head"><div><span class="kicker">Abschnitt ${index+1}</span><h3>${esc(street.name)}</h3><p>Soll: ${street.target}${markerCount ? ` · ${markerCount} mit Foto` : ''}</p></div><a class="map-link" href="${streetUrl(street.name)}" target="_blank" rel="noopener" aria-label="${esc(street.name)} in Google Maps öffnen">Google Maps ↗</a></div><button class="capture-button" type="button" data-capture>◎ Plakat + Foto erfassen</button><div class="count-control"><button type="button" data-count="-1" aria-label="Ein Plakat abziehen">−</button><output>${section.count}</output><button type="button" data-count="1" aria-label="Ein Plakat hinzufügen">+</button></div><div class="street-actions"><button class="secondary-button" type="button" data-problem>Problem melden</button><button class="done-button" type="button" data-done>${section.done ? '✓ Fertig' : 'Abschnitt fertig'}</button></div>${section.problems.length ? `<span class="problem-badge">${section.problems.length} Meldung${section.problems.length === 1 ? '' : 'en'}</span>` : ''}</section>`;
+    const targetText = def.flexible ? 'Beliebig viele Standorte' : `Soll: ${street.target}`;
+    return `<section class="street-card ${def.flexible ? 'flexible-street' : ''} ${section.done ? 'done' : ''}" data-section="${index}"><div class="street-head"><div><span class="kicker">${def.flexible ? 'Freie Erfassung' : `Abschnitt ${index+1}`}</span><h3>${esc(street.name)}</h3><p>${targetText}${markerCount ? ` · ${markerCount} mit Foto` : ''}</p></div><a class="map-link" href="${streetUrl(street.name)}" target="_blank" rel="noopener" aria-label="${esc(street.name)} in Google Maps öffnen">Google Maps ↗</a></div><button class="capture-button" type="button" data-capture>◎ Plakat + Foto erfassen</button><div class="count-control"><button type="button" data-count="-1" aria-label="Ein Plakat abziehen">−</button><output>${section.count}</output><button type="button" data-count="1" aria-label="Ein Plakat hinzufügen">+</button></div><div class="street-actions"><button class="secondary-button" type="button" data-problem>Problem melden</button><button class="done-button" type="button" data-done>${section.done ? '✓ Fertig' : def.flexible ? 'Abschlusstour fertig' : 'Abschnitt fertig'}</button></div>${section.problems.length ? `<span class="problem-badge">${section.problems.length} Meldung${section.problems.length === 1 ? '' : 'en'}</span>` : ''}</section>`;
   }
 
   function markerCard(marker, def) {
@@ -497,8 +525,8 @@
     const tourState = state.tours[String(activeTourId)];
     const unfinished = def.streets.filter((_, index) => !tourState.sections[index].done);
     const count = tourCompleted(def), difference = def.target - count;
-    dom.finishCheck.innerHTML = `<div class="check-list"><div class="check-item ${unfinished.length ? 'warn' : ''}">${unfinished.length ? `⚠ ${unfinished.length} Abschnitt(e) noch nicht als fertig markiert` : '✓ Alle Abschnitte markiert'}</div><div class="check-item ${difference !== 0 ? 'warn' : ''}">${difference === 0 ? '✓ Sollmenge erreicht' : `⚠ ${Math.abs(difference)} Plakate ${difference > 0 ? 'unter' : 'über'} Soll`}</div><div class="check-item">${count} von ${def.target} Plakaten dokumentiert</div></div>`;
-    finishNeedsNote = unfinished.length > 0 || difference !== 0;
+    dom.finishCheck.innerHTML = def.flexible ? `<div class="check-list"><div class="check-item ${unfinished.length ? 'warn' : ''}">${unfinished.length ? '⚠ Abschlusstour noch nicht als fertig markiert' : '✓ Abschlusstour als fertig markiert'}</div><div class="check-item">${count} Plakat${count === 1 ? '' : 'e'} dokumentiert</div><div class="check-item">Keine feste Sollmenge – alle erfassten Standorte werden gespeichert.</div></div>` : `<div class="check-list"><div class="check-item ${unfinished.length ? 'warn' : ''}">${unfinished.length ? `⚠ ${unfinished.length} Abschnitt(e) noch nicht als fertig markiert` : '✓ Alle Abschnitte markiert'}</div><div class="check-item ${difference !== 0 ? 'warn' : ''}">${difference === 0 ? '✓ Sollmenge erreicht' : `⚠ ${Math.abs(difference)} Plakate ${difference > 0 ? 'unter' : 'über'} Soll`}</div><div class="check-item">${count} von ${def.target} Plakaten dokumentiert</div></div>`;
+    finishNeedsNote = def.flexible ? unfinished.length > 0 : unfinished.length > 0 || difference !== 0;
     dom.finishNote.value = tourState.finishNote || '';
     dom.finishNote.style.borderColor = '';
     dom.finishDialog.showModal();

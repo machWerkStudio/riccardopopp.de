@@ -24,7 +24,7 @@ $sectionIndex = (int)($_POST['sectionIndex'] ?? -1);
 $lat = filter_var($_POST['lat'] ?? null, FILTER_VALIDATE_FLOAT);
 $lng = filter_var($_POST['lng'] ?? null, FILTER_VALIDATE_FLOAT);
 $accuracy = filter_var($_POST['accuracy'] ?? null, FILTER_VALIDATE_FLOAT);
-if (!preg_match('/^[a-zA-Z0-9-]{16,60}$/', $id) || $tourId < 1 || $tourId > 11 || $sectionIndex < 0 || $sectionIndex > 9 || $lat === false || $lng === false || abs((float)$lat) > 90 || abs((float)$lng) > 180 || $accuracy === false) {
+if (!preg_match('/^[a-zA-Z0-9-]{16,60}$/', $id) || $tourId < 1 || $tourId > 12 || $sectionIndex < 0 || $sectionIndex > 9 || $lat === false || $lng === false || abs((float)$lat) > 90 || abs((float)$lng) > 180 || $accuracy === false) {
     http_response_code(422);
     echo json_encode(['ok' => false, 'message' => 'Standortdaten sind ungültig.']);
     exit;
