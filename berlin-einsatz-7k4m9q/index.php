@@ -169,7 +169,7 @@ $csrf = (string)$_SESSION['csrf'];
   </dialog>
 
   <script src="vendor/leaflet/leaflet.js?v=1" defer></script>
-  <script src="app.js?v=16" defer></script>
+  <script src="app.js?v=17" defer></script>
 <?php endif; ?>
 </body>
 </html>

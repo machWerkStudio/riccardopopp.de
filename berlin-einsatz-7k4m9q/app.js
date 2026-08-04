@@ -8,6 +8,7 @@
   const localKey = 'berlin-einsatz-backup-v1';
   const driverKey = 'berlin-einsatz-driver-v1';
   const backupKey = 'berlin-einsatz-last-backup-v1';
+  const manualCountOffset = 60;
   const chatQueueKey = 'berlin-einsatz-chat-queue-v1';
   const chatSeenKey = 'berlin-einsatz-chat-seen-v1';
   const problemTypes = ['Keine freie Fläche', 'Pfosten / Halterung beschädigt', 'Abschnitt nicht zugänglich', 'Ordnungsamt / Polizei', 'Sonstige Besonderheit'];
@@ -163,7 +164,8 @@
   }
 
   function totalCompleted() {
-    return sum(definitions.flatMap(def => state.tours[String(def.id)].sections.map(section => section.count)));
+    const documentedCount = sum(definitions.flatMap(def => state.tours[String(def.id)].sections.map(section => section.count)));
+    return documentedCount + manualCountOffset;
   }
 
   function tourCompleted(def) {
